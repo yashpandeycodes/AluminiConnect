@@ -35,7 +35,22 @@ export async function POST(req: NextRequest) {
       }
       const arrayBuffer = await response.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
-      const pdfParse = require("pdf-parse");
+      
+      // Polyfill for pdfjs-dist used by pdf-parse in Node.js
+      if (typeof global !== "undefined") {
+        if (!global.DOMMatrix) {
+          (global as any).DOMMatrix = class DOMMatrix {};
+        }
+        if (!global.ImageData) {
+          (global as any).ImageData = class ImageData {};
+        }
+        if (!global.Path2D) {
+          (global as any).Path2D = class Path2D {};
+        }
+      }
+
+      const pdfParseModule = require("pdf-parse");
+      const pdfParse = typeof pdfParseModule === "function" ? pdfParseModule : pdfParseModule.PDFParse;
       const data = await pdfParse(buffer);
       finalResumeText = data.text;
     }

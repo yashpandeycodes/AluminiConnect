@@ -4,7 +4,7 @@ export const profileRepository = {
   async upsertStudentProfile(userId: string, data: {
     department: string;
     skills: string[];
-    projects?: unknown;
+    projects?: string | null;
     resumeUrl?: string | null;
   }) {
     return await prisma.studentProfile.upsert({
@@ -12,14 +12,14 @@ export const profileRepository = {
       update: {
         department: data.department,
         skills: data.skills,
-        projects: data.projects ?? undefined,
+        projects: data.projects,
         resumeUrl: data.resumeUrl,
       },
       create: {
         userId,
         department: data.department,
         skills: data.skills,
-        projects: data.projects ?? undefined,
+        projects: data.projects,
         resumeUrl: data.resumeUrl,
       }
     });

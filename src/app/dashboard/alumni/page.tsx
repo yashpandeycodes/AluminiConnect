@@ -29,7 +29,7 @@ export default function AlumniDashboard() {
 
   // Post Opportunity Modal
   const [showPostModal, setShowPostModal] = useState(false);
-  const [postForm, setPostForm] = useState({ title: "", company: "", role: "", description: "", link: "", type: "FULL_TIME", location: "" });
+  const [postForm, setPostForm] = useState({ company: "", role: "", eligibility: "", requiredSkills: "", deadline: "", applicationLink: "" });
   const [postingJob, setPostingJob] = useState(false);
 
   // Review Referral Modal
@@ -62,7 +62,7 @@ export default function AlumniDashboard() {
       .then(res => res.json())
       .then(data => {
         if (data.success) {
-          setStats(s => ({ ...s, score: data.data.totalPoints }));
+          setStats(s => ({ ...s, score: data.data.score }));
         }
         setLoadingStats(false);
       }).catch(() => setLoadingStats(false));
@@ -124,7 +124,10 @@ export default function AlumniDashboard() {
       const res = await fetch("/api/opportunities", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(postForm)
+        body: JSON.stringify({
+          ...postForm,
+          requiredSkills: postForm.requiredSkills.split(",").map(s => s.trim()).filter(Boolean)
+        })
       });
       const data = await res.json();
       if (data.success) {
@@ -171,9 +174,8 @@ export default function AlumniDashboard() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          studentName: "Student", // We don't have the requester name in the referral model natively populated without include
-          studentRole: "Target Role",
-          opportunityName: "the requested position"
+          studentInfo: reviewingReferral?.requester?.name || "Student",
+          opportunityInfo: reviewingReferral?.opportunity ? `${reviewingReferral.opportunity.role} at ${reviewingReferral.opportunity.company}` : "Target Role"
         })
       });
       const data = await res.json();
@@ -364,10 +366,6 @@ export default function AlumniDashboard() {
             <button onClick={() => setShowPostModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white"><X className="w-6 h-6" /></button>
             <h2 className="text-2xl font-bold text-white mb-6">Post an Opportunity</h2>
             <form onSubmit={handlePostOpportunity} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1">Job Title</label>
-                <input required type="text" className="w-full px-4 py-2 rounded-lg glass-input text-white" value={postForm.title} onChange={e => setPostForm({...postForm, title: e.target.value})} />
-              </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-1">Company</label>
@@ -378,26 +376,23 @@ export default function AlumniDashboard() {
                   <input required type="text" className="w-full px-4 py-2 rounded-lg glass-input text-white" value={postForm.role} onChange={e => setPostForm({...postForm, role: e.target.value})} />
                 </div>
               </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1">Eligibility</label>
+                <input required type="text" className="w-full px-4 py-2 rounded-lg glass-input text-white" value={postForm.eligibility} onChange={e => setPostForm({...postForm, eligibility: e.target.value})} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1">Required Skills (comma separated)</label>
+                <input required type="text" className="w-full px-4 py-2 rounded-lg glass-input text-white" value={postForm.requiredSkills} onChange={e => setPostForm({...postForm, requiredSkills: e.target.value})} />
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1">Location</label>
-                  <input required type="text" className="w-full px-4 py-2 rounded-lg glass-input text-white" value={postForm.location} onChange={e => setPostForm({...postForm, location: e.target.value})} />
+                  <label className="block text-sm font-medium text-slate-300 mb-1">Deadline (YYYY-MM-DD)</label>
+                  <input required type="date" className="w-full px-4 py-2 rounded-lg glass-input text-white" value={postForm.deadline} onChange={e => setPostForm({...postForm, deadline: e.target.value})} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1">Type</label>
-                  <select className="w-full px-4 py-2 rounded-lg glass-input text-white bg-[#0f172a]" value={postForm.type} onChange={e => setPostForm({...postForm, type: e.target.value})}>
-                    <option value="FULL_TIME">Full Time</option>
-                    <option value="INTERNSHIP">Internship</option>
-                  </select>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">Application Link</label>
+                  <input required type="url" className="w-full px-4 py-2 rounded-lg glass-input text-white" value={postForm.applicationLink} onChange={e => setPostForm({...postForm, applicationLink: e.target.value})} />
                 </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1">Description</label>
-                <textarea required className="w-full px-4 py-2 rounded-lg glass-input text-white min-h-[80px]" value={postForm.description} onChange={e => setPostForm({...postForm, description: e.target.value})} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1">Link (Optional)</label>
-                <input type="url" className="w-full px-4 py-2 rounded-lg glass-input text-white" value={postForm.link} onChange={e => setPostForm({...postForm, link: e.target.value})} />
               </div>
               <button type="submit" disabled={postingJob} className="w-full py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-medium transition-colors disabled:opacity-50 mt-4">
                 {postingJob ? "Posting..." : "Post Opportunity"}

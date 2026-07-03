@@ -33,7 +33,7 @@ model StudentProfile {
   userId     String   @unique
   department String
   skills     String[]
-  projects   Json?
+  projects   String?
   resumeUrl  String?
   user       User     @relation(fields: [userId], references: [id])
 }

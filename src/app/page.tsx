@@ -1,5 +1,5 @@
 "use client";
-
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { ArrowRight, Sparkles, GraduationCap, Users, Briefcase } from "lucide-react";
@@ -20,10 +20,49 @@ export default function LandingPage() {
     visible: { opacity: 1, y: 0, transition: { duration: 0.6 } }
   };
 
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   return (
-    <div className="min-h-screen auth-bg overflow-x-hidden pt-20">
-      <div className="absolute inset-0 bg-[#0b1120]/80 z-0" />
+    <div className="min-h-screen relative overflow-x-hidden pt-20">
+      {/* Unsplash Background */}
+      <div 
+        className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: 'url("https://images.unsplash.com/photo-1557683316-973673baf926?q=80&w=2000&auto=format&fit=crop")' }}
+      />
       
+      {/* Overlay to ensure readability and blue-purple tint */}
+      <div className="absolute inset-0 z-0 bg-gradient-to-br from-[#0b1120]/95 via-[#1e1b4b]/90 to-[#0b1120]/95 backdrop-blur-[2px]" />
+      
+      {/* Falling Stars Animation */}
+      {mounted && (
+        <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+          {[...Array(20)].map((_, i) => (
+            <motion.div
+              key={i}
+              className="absolute w-1 h-1 bg-white rounded-full shadow-[0_0_10px_#fff]"
+              style={{
+                top: Math.random() * -100,
+                left: `${Math.random() * 100}%`,
+                opacity: Math.random() * 0.5 + 0.2
+              }}
+              animate={{
+                y: ["0vh", "100vh"],
+                x: ["0vw", `${Math.random() * 20 - 10}vw`]
+              }}
+              transition={{
+                duration: Math.random() * 5 + 5,
+                repeat: Infinity,
+                ease: "linear",
+                delay: Math.random() * 5
+              }}
+            />
+          ))}
+        </div>
+      )}
+
       {/* Hero Section */}
       <div className="relative z-10 max-w-7xl mx-auto px-6 pt-32 pb-20 lg:pt-48 lg:pb-32 text-center">
         <motion.div

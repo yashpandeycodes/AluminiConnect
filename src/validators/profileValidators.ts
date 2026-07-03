@@ -3,7 +3,7 @@ import { z } from "zod";
 export const studentProfileSchema = z.object({
   department: z.string().min(2, "Department must be provided.").max(100),
   skills: z.array(z.string().max(50)).min(1, "At least one skill is required.").max(50),
-  projects: z.unknown().optional(), // Can be made stricter based on UI implementation
+  projects: z.string().optional().nullable(), // Can be made stricter based on UI implementation
   resumeUrl: z.string().url().max(500).optional().nullable(),
 });
 

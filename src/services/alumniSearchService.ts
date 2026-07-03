@@ -6,6 +6,7 @@ export type AlumniSearchParams = {
   industry?: string;
   department?: string;
   graduationYear?: number;
+  query?: string;
 };
 
 type AlumniWithUser = {
@@ -95,6 +96,15 @@ export const alumniSearchService = {
       whereClause.user = {
         graduationYear: filters.graduationYear
       };
+    }
+
+    if (filters.query) {
+      whereClause.OR = [
+        { company: { contains: filters.query, mode: "insensitive" } },
+        { jobRole: { contains: filters.query, mode: "insensitive" } },
+        { user: { name: { contains: filters.query, mode: "insensitive" } } },
+        { skills: { hasSome: [filters.query] } }
+      ];
     }
 
     // 3. Fetch alumni from DB

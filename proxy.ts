@@ -1,9 +1,9 @@
 import { withAuth } from "next-auth/middleware";
 import { NextResponse } from "next/server";
-import { hasRole } from "./lib/rbac";
+import { hasRole } from "@/lib/rbac";
 
 export default withAuth(
-  function middleware(req) {
+  function proxy(req) {
     const { pathname } = req.nextUrl;
     const userRole = req.nextauth.token?.role as string;
 

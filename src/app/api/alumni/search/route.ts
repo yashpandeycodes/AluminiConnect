@@ -31,6 +31,9 @@ export async function GET(req: NextRequest) {
     filters.graduationYear = parseInt(graduationYear);
   }
 
+  const query = searchParams.get("query");
+  if (query) filters.query = query;
+
   try {
     const result = await alumniSearchService.searchAlumni(session.user.id, filters);
     return NextResponse.json(result, { status: 200 });

@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { Search, Briefcase, Bot, UserPlus, FileText, CheckCircle, Loader2, X } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { UploadButton } from "@/lib/uploadthing";
+import { jsPDF } from "jspdf";
 
 export default function StudentDashboard() {
   const { data: session } = useSession();
@@ -86,14 +87,28 @@ export default function StudentDashboard() {
     finally { setSavingProfile(false); }
   };
 
-  const handleResumeScore = async () => {
-    if (!resumeUrl || !targetRole) return alert("Please upload resume and enter target role.");
+  const generateResumeText = () => {
+    if (!profile) return "";
+    return `Name: ${session?.user?.name || "Student"}
+Email: ${session?.user?.email || ""}
+Department: ${profile.department || ""}
+Skills: ${(profile.skills || []).join(", ")}
+
+Recent Projects & Experience:
+${profile.projects || "None specified."}
+`;
+  };
+
+  const handleBuildAndScoreResume = async () => {
+    const text = generateResumeText();
+    if (!text || !profile) return alert("Please complete your profile first.");
+    if (!targetRole) return alert("Please enter target role.");
     setAiLoading(true);
     try {
       const res = await fetch("/api/ai/resume-score", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ resumeUrl, targetRole })
+        body: JSON.stringify({ resumeText: text, targetRole })
       });
       const data = await res.json();
       if (data.success) setAiResult(data.data);
@@ -102,6 +117,33 @@ export default function StudentDashboard() {
     finally { setAiLoading(false); }
   };
 
+  const handleDownloadResumePdf = () => {
+    const text = generateResumeText();
+    if (!text) return alert("Please complete your profile first.");
+    const doc = new jsPDF();
+    doc.setFont("helvetica", "normal");
+    const lines = doc.splitTextToSize(text, 180);
+    doc.text(lines, 15, 15);
+    doc.save(`${session?.user?.name || "resume"}.pdf`);
+  };
+
+  const handleResumeScore = async () => {
+    const activeResumeUrl = profile?.resumeUrl;
+    if (!activeResumeUrl) return alert("Please upload your resume in your profile first.");
+    if (!targetRole) return alert("Please enter target role.");
+    setAiLoading(true);
+    try {
+      const res = await fetch("/api/ai/resume-score", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ resumeUrl: activeResumeUrl, targetRole })
+      });
+      const data = await res.json();
+      if (data.success) setAiResult(data.data);
+      else alert(data.error?.message || "Failed to score resume");
+    } catch (err) { alert("Error occurred."); }
+    finally { setAiLoading(false); }
+  };
   const handleGenerateRoadmap = async () => {
     if (!targetRole) return alert("Please enter a target role.");
     setAiLoading(true);
@@ -110,9 +152,8 @@ export default function StudentDashboard() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          targetRole,
-          currentSkills: profile?.skills || [],
-          experienceLevel: "Beginner"
+          careerGoal: targetRole,
+          currentSkills: profile?.skills || []
         })
       });
       const data = await res.json();
@@ -152,11 +193,19 @@ export default function StudentDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0b1120] p-6 lg:p-12 relative overflow-hidden">
-      <div className="absolute top-0 right-0 w-96 h-96 bg-blue-600/10 rounded-full blur-[100px] -translate-y-1/2" />
-      <div className="absolute bottom-0 left-0 w-96 h-96 bg-cyan-600/10 rounded-full blur-[100px] translate-y-1/2" />
+    <div className="min-h-screen relative overflow-hidden">
+      {/* Background Image & Blur */}
+      <div 
+        className="fixed inset-0 z-0 bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: 'url("https://images.unsplash.com/photo-1557682250-33bd709cbe85?q=80&w=2000&auto=format&fit=crop")' }}
+      />
+      <div className="fixed inset-0 z-0 bg-gradient-to-br from-[#0b1120]/90 via-[#312e81]/80 to-[#0b1120]/90 backdrop-blur-md" />
       
-      <div className="max-w-7xl mx-auto relative z-10">
+      {/* Animated Orbs */}
+      <div className="fixed top-0 right-0 w-96 h-96 bg-blue-500/20 rounded-full blur-[120px] -translate-y-1/2" />
+      <div className="fixed bottom-0 left-0 w-96 h-96 bg-purple-500/20 rounded-full blur-[120px] translate-y-1/2" />
+      
+      <div className="max-w-7xl mx-auto relative z-10 p-6 lg:p-12">
         <header className="mb-12">
           <motion.h1 
             initial={{ opacity: 0, x: -20 }}
@@ -195,8 +244,30 @@ export default function StudentDashboard() {
                     <input type="text" className="w-full px-4 py-2 rounded-lg glass-input text-white" value={profileForm.skills} onChange={e => setProfileForm({...profileForm, skills: e.target.value})} />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-1">Resume URL</label>
-                    <input type="url" className="w-full px-4 py-2 rounded-lg glass-input text-white" value={profileForm.resumeUrl} onChange={e => setProfileForm({...profileForm, resumeUrl: e.target.value})} />
+                    <label className="block text-sm font-medium text-slate-300 mb-1">Recent Projects / Experience</label>
+                    <textarea 
+                      className="w-full px-4 py-2 rounded-lg glass-input text-white h-24 resize-none" 
+                      placeholder="Describe your recent projects and experiences to include in your generated resume..."
+                      value={profileForm.projects} 
+                      onChange={e => setProfileForm({...profileForm, projects: e.target.value})} 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-1">Resume (PDF)</label>
+                    {profileForm.resumeUrl ? (
+                      <div className="flex items-center justify-between px-4 py-2 rounded-lg glass-input text-white">
+                        <span className="truncate max-w-[200px]">{profileForm.resumeUrl}</span>
+                        <button type="button" onClick={() => setProfileForm({...profileForm, resumeUrl: ""})} className="text-red-400 hover:text-red-300 text-sm">Remove</button>
+                      </div>
+                    ) : (
+                      <div className="glass p-4 rounded-lg">
+                        <UploadButton
+                          endpoint="resumeUploader"
+                          onClientUploadComplete={(res) => setProfileForm({...profileForm, resumeUrl: res[0].ufsUrl})}
+                          onUploadError={(error: Error) => alert(`ERROR! ${error.message}`)}
+                        />
+                      </div>
+                    )}
                   </div>
                   <div className="flex justify-end gap-3 pt-4">
                     <button type="button" onClick={() => setIsEditingProfile(false)} className="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-white/10 transition-colors">Cancel</button>
@@ -219,6 +290,12 @@ export default function StudentDashboard() {
                       )) : <span className="text-slate-400">None</span>}
                     </div>
                   </div>
+                  {profile.projects && (
+                    <div className="col-span-2">
+                      <p className="text-sm text-slate-500 mb-1">Recent Projects / Experience</p>
+                      <p className="text-white text-sm whitespace-pre-wrap">{profile.projects}</p>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="text-center py-6">
@@ -246,8 +323,8 @@ export default function StudentDashboard() {
                     <motion.div key={job.id} className="glass-card p-6 hover:bg-white/[0.05] transition-colors group">
                       <div className="flex justify-between items-start mb-4">
                         <div>
-                          <h3 className="text-lg font-bold text-white group-hover:text-blue-400 transition-colors">{job.title}</h3>
-                          <p className="text-sm text-slate-400">{job.company} • {job.location}</p>
+                          <h3 className="text-lg font-bold text-white group-hover:text-blue-400 transition-colors">{job.role}</h3>
+                          <p className="text-sm text-slate-400">{job.company}</p>
                         </div>
                         <button 
                           onClick={() => handleRequestReferral(job.id)}
@@ -256,9 +333,15 @@ export default function StudentDashboard() {
                           Request Referral
                         </button>
                       </div>
-                      <p className="text-sm text-slate-300 mb-4 line-clamp-2">{job.description}</p>
-                      <div className="flex items-center text-xs text-slate-500">
-                        Posted {new Date(job.createdAt).toLocaleDateString()}
+                      <p className="text-sm text-slate-300 mb-2 line-clamp-2"><span className="font-semibold text-slate-400">Eligibility:</span> {job.eligibility}</p>
+                      <div className="flex gap-2 mb-4 flex-wrap">
+                        {job.requiredSkills?.map((s: string) => (
+                          <span key={s} className="px-2 py-0.5 bg-cyan-500/10 text-cyan-300 text-xs rounded border border-cyan-500/20">{s}</span>
+                        ))}
+                      </div>
+                      <div className="flex justify-between items-center text-xs text-slate-500">
+                        <span>Posted {new Date(job.createdAt).toLocaleDateString()}</span>
+                        {job.applicationLink && <a href={job.applicationLink} target="_blank" rel="noreferrer" className="text-blue-400 hover:underline">Apply Here</a>}
                       </div>
                     </motion.div>
                   ))
@@ -321,22 +404,38 @@ export default function StudentDashboard() {
                   <input type="text" className="w-full px-4 py-2 rounded-lg glass-input text-white" placeholder="e.g. Frontend Developer" value={targetRole} onChange={e => setTargetRole(e.target.value)} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Upload Resume (PDF)</label>
-                  {resumeUrl ? (
-                    <div className="p-4 bg-green-500/20 border border-green-500/30 rounded-lg text-green-400 text-sm">Resume uploaded successfully!</div>
-                  ) : (
-                    <div className="glass p-4 rounded-lg">
-                      <UploadButton
-                        endpoint="resumeUploader"
-                        onClientUploadComplete={(res) => setResumeUrl(res[0].url)}
-                        onUploadError={(error: Error) => alert(`ERROR! ${error.message}`)}
-                      />
+                  <label className="block text-sm font-medium text-slate-300 mb-2">Resume Options</label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-4 bg-white/5 border border-white/10 rounded-lg flex flex-col justify-between">
+                      <div>
+                        <h4 className="text-white font-bold mb-1">Uploaded PDF</h4>
+                        {profile?.resumeUrl ? (
+                          <p className="text-green-400 text-xs">Resume is loaded.</p>
+                        ) : (
+                          <p className="text-yellow-400 text-xs">No resume found.</p>
+                        )}
+                      </div>
+                      <button onClick={handleResumeScore} disabled={aiLoading || !profile?.resumeUrl || !targetRole} className="mt-4 w-full py-2 bg-blue-600/50 hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
+                        Score Uploaded
+                      </button>
                     </div>
-                  )}
+
+                    <div className="p-4 bg-white/5 border border-white/10 rounded-lg flex flex-col justify-between">
+                      <div>
+                        <h4 className="text-white font-bold mb-1">Build from Profile</h4>
+                        <p className="text-slate-400 text-xs">Uses your Skills & Projects</p>
+                      </div>
+                      <div className="mt-4 flex gap-2">
+                        <button onClick={handleBuildAndScoreResume} disabled={aiLoading || !targetRole} className="flex-1 py-2 bg-purple-600/50 hover:bg-purple-600 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
+                          Build & Score
+                        </button>
+                        <button onClick={handleDownloadResumePdf} disabled={aiLoading} className="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm font-medium transition-colors" title="Download PDF">
+                          PDF
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <button onClick={handleResumeScore} disabled={aiLoading || !resumeUrl || !targetRole} className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
-                  {aiLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Analyze Resume"}
-                </button>
               </div>
             )}
 
@@ -419,8 +518,8 @@ export default function StudentDashboard() {
               {searchResults.map((alumni) => (
                 <div key={alumni.id} className="p-4 bg-white/[0.02] border border-white/5 hover:border-white/10 transition-colors rounded-xl flex items-center justify-between">
                   <div>
-                    <h3 className="font-bold text-white text-lg">{alumni.name}</h3>
-                    <p className="text-sm text-slate-400">{alumni.role} at {alumni.company}</p>
+                    <h3 className="font-bold text-white text-lg">{alumni.user?.name || "Unknown User"}</h3>
+                    <p className="text-sm text-slate-400">{alumni.jobRole} at {alumni.company}</p>
                     <div className="flex gap-2 mt-2">
                       {alumni.skills?.slice(0, 3).map((s: string) => (
                         <span key={s} className="px-2 py-0.5 bg-purple-500/10 text-purple-300 text-xs rounded border border-purple-500/20">{s}</span>
