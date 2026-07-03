@@ -1,4 +1,4 @@
-import { generateJSON } from "@/lib/ai/gemini";
+import { generateJSON, generateJSONWithPdf } from "@/lib/ai/gemini";
 import { buildAtsScorePrompt, buildReferralMessagePrompt, buildCareerRoadmapPrompt } from "@/lib/ai/prompts";
 import { Result } from "@/types";
 
@@ -33,6 +33,20 @@ export const aiCareerService = {
     } catch (error) {
       console.error("Score resume error:", error);
       return { success: false, error: { code: "INTERNAL_ERROR", message: "Failed to score resume." } };
+    }
+  },
+
+  async scoreResumePdf(pdfBase64: string, targetRole: string): Promise<Result<AtsScoreResult>> {
+    try {
+      if (!pdfBase64 || !targetRole) {
+         return { success: false, error: { code: "INVALID_REQUEST", message: "Resume PDF and target role are required." } };
+      }
+      const prompt = buildAtsScorePrompt("Evaluate the attached PDF resume.", targetRole);
+      const data = await generateJSONWithPdf<AtsScoreResult>(pdfBase64, prompt);
+      return { success: true, data };
+    } catch (error) {
+      console.error("Score resume PDF error:", error);
+      return { success: false, error: { code: "INTERNAL_ERROR", message: "Failed to score resume PDF." } };
     }
   },
 

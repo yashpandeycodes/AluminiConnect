@@ -44,3 +44,30 @@ export async function generateJSON<T>(prompt: string): Promise<T> {
     throw new Error("AI_RESPONSE_PARSE_FAILED");
   }
 }
+
+/**
+ * Send a PDF file (as base64) directly to Gemini and get structured JSON back.
+ * Gemini 2.5 Flash natively understands PDFs — no pdf-parse needed.
+ */
+export async function generateJSONWithPdf<T>(pdfBase64: string, prompt: string): Promise<T> {
+  const jsonInstruction =
+    prompt +
+    "\n\nRespond with ONLY valid JSON. No markdown fences, no preamble, no explanation.";
+  try {
+    const result = await model.generateContent([
+      {
+        inlineData: {
+          mimeType: "application/pdf",
+          data: pdfBase64,
+        },
+      },
+      { text: jsonInstruction },
+    ]);
+    const text = result.response.text();
+    const cleaned = text.replace(/```json|```/g, "").trim();
+    return JSON.parse(cleaned) as T;
+  } catch (err) {
+    console.error("Gemini PDF API error:", err);
+    throw new Error("AI_GENERATION_FAILED");
+  }
+}

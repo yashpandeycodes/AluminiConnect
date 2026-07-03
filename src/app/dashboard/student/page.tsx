@@ -33,6 +33,9 @@ export default function StudentDashboard() {
   const [targetRole, setTargetRole] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiResult, setAiResult] = useState<any>(null);
+  const [scoreSource, setScoreSource] = useState<"PDF" | "PROFILE" | null>(null);
+  const [uploadedPdfBase64, setUploadedPdfBase64] = useState<string | null>(null);
+  const [uploadedPdfName, setUploadedPdfName] = useState<string | null>(null);
 
   // Search Modal States
   const [searchQuery, setSearchQuery] = useState("");
@@ -111,7 +114,10 @@ ${profile.projects || "None specified."}
         body: JSON.stringify({ resumeText: text, targetRole })
       });
       const data = await res.json();
-      if (data.success) setAiResult(data.data);
+      if (data.success) {
+        setAiResult(data.data);
+        setScoreSource("PROFILE");
+      }
       else alert(data.error?.message || "Failed to score resume");
     } catch (err) { alert("Error occurred."); }
     finally { setAiLoading(false); }
@@ -127,25 +133,29 @@ ${profile.projects || "None specified."}
     doc.save(`${session?.user?.name || "resume"}.pdf`);
   };
 
-  const handleResumeScore = async () => {
-    const activeResumeUrl = profile?.resumeUrl;
-    if (!activeResumeUrl) return alert("Please upload your resume in your profile first.");
+  const handleScoreUploadedPdf = async () => {
+    if (!uploadedPdfBase64) return alert("Please select a PDF resume first.");
     if (!targetRole) return alert("Please enter target role.");
     setAiLoading(true);
     try {
       const res = await fetch("/api/ai/resume-score", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ resumeUrl: activeResumeUrl, targetRole })
+        body: JSON.stringify({ pdfBase64: uploadedPdfBase64, targetRole })
       });
       const data = await res.json();
-      if (data.success) setAiResult(data.data);
+      if (data.success) {
+        setAiResult(data.data);
+        setScoreSource("PDF");
+      }
       else alert(data.error?.message || "Failed to score resume");
     } catch (err) { alert("Error occurred."); }
     finally { setAiLoading(false); }
   };
   const handleGenerateRoadmap = async () => {
     if (!targetRole) return alert("Please enter a target role.");
+    const skills = profile?.skills || [];
+    if (skills.length === 0) return alert("Please add your skills in your profile first so the AI can analyze your skill gap.");
     setAiLoading(true);
     try {
       const res = await fetch("/api/ai/career-roadmap", {
@@ -153,7 +163,7 @@ ${profile.projects || "None specified."}
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           careerGoal: targetRole,
-          currentSkills: profile?.skills || []
+          currentSkills: skills
         })
       });
       const data = await res.json();
@@ -408,16 +418,40 @@ ${profile.projects || "None specified."}
                   <div className="grid grid-cols-2 gap-4">
                     <div className="p-4 bg-white/5 border border-white/10 rounded-lg flex flex-col justify-between">
                       <div>
-                        <h4 className="text-white font-bold mb-1">Uploaded PDF</h4>
-                        {profile?.resumeUrl ? (
-                          <p className="text-green-400 text-xs">Resume is loaded.</p>
+                        <h4 className="text-white font-bold mb-1">Score Custom Resume</h4>
+                        <p className="text-slate-400 text-xs mb-3">Upload any PDF to score it.</p>
+                        {uploadedPdfName ? (
+                          <p className="text-green-400 text-xs truncate" title={uploadedPdfName}>{uploadedPdfName}</p>
                         ) : (
-                          <p className="text-yellow-400 text-xs">No resume found.</p>
+                          <p className="text-yellow-400 text-xs">No file selected.</p>
                         )}
                       </div>
-                      <button onClick={handleResumeScore} disabled={aiLoading || !profile?.resumeUrl || !targetRole} className="mt-4 w-full py-2 bg-blue-600/50 hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
-                        Score Uploaded
-                      </button>
+                      <div className="mt-4 flex flex-col gap-2">
+                        <input 
+                          type="file" 
+                          accept="application/pdf" 
+                          className="hidden" 
+                          id="resume-pdf-upload" 
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              setUploadedPdfName(file.name);
+                              const reader = new FileReader();
+                              reader.onload = (ev) => {
+                                const base64 = (ev.target?.result as string).split(',')[1];
+                                setUploadedPdfBase64(base64);
+                              };
+                              reader.readAsDataURL(file);
+                            }
+                          }} 
+                        />
+                        <label htmlFor="resume-pdf-upload" className="w-full py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm font-medium transition-colors cursor-pointer text-center">
+                          Choose File
+                        </label>
+                        <button onClick={handleScoreUploadedPdf} disabled={aiLoading || !uploadedPdfBase64 || !targetRole} className="w-full py-2 bg-blue-600/50 hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
+                          Score PDF
+                        </button>
+                      </div>
                     </div>
 
                     <div className="p-4 bg-white/5 border border-white/10 rounded-lg flex flex-col justify-between">
@@ -427,10 +461,7 @@ ${profile.projects || "None specified."}
                       </div>
                       <div className="mt-4 flex gap-2">
                         <button onClick={handleBuildAndScoreResume} disabled={aiLoading || !targetRole} className="flex-1 py-2 bg-purple-600/50 hover:bg-purple-600 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
-                          Build & Score
-                        </button>
-                        <button onClick={handleDownloadResumePdf} disabled={aiLoading} className="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm font-medium transition-colors" title="Download PDF">
-                          PDF
+                          Generate Score & Review
                         </button>
                       </div>
                     </div>
@@ -455,16 +486,40 @@ ${profile.projects || "None specified."}
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
                   <h3 className="text-xl font-bold text-white">Analysis Complete</h3>
-                  <button onClick={() => setAiResult(null)} className="text-sm text-blue-400 hover:underline">Start Over</button>
+                  <button onClick={() => { setAiResult(null); setAiMode("SELECT"); setScoreSource(null); }} className="text-sm text-blue-400 hover:underline">Start Over</button>
                 </div>
-                <div className="p-6 bg-white/[0.02] border border-white/10 rounded-xl">
-                  {aiResult.score && (
+                
+                {aiMode === "SCORE" && scoreSource === "PROFILE" && (
+                  <div className="flex justify-end mb-4">
+                     <button onClick={handleDownloadResumePdf} className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+                        <FileText className="w-4 h-4" /> Download Generated Resume as PDF
+                     </button>
+                  </div>
+                )}
+                
+                <div className="p-6 bg-white/[0.02] border border-white/10 rounded-xl space-y-6">
+                  {/* ATS Score */}
+                  {aiResult.score !== undefined && (
                     <div className="mb-4 text-center">
                       <div className="text-5xl font-black text-blue-400 mb-2">{aiResult.score}/100</div>
                       <p className="text-slate-400">ATS Match Score</p>
                     </div>
                   )}
-                  {aiResult.suggestions && (
+
+                  {/* Missing Keywords (Resume Score) */}
+                  {aiResult.missingKeywords && aiResult.missingKeywords.length > 0 && (
+                    <div>
+                      <h4 className="font-bold text-white mb-2">Missing Keywords</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {aiResult.missingKeywords.map((kw: string, i: number) => (
+                          <span key={i} className="px-3 py-1 bg-red-500/20 border border-red-500/30 text-red-300 rounded-full text-xs">{kw}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Suggestions (Resume Score) */}
+                  {aiResult.suggestions && aiResult.suggestions.length > 0 && (
                     <div>
                       <h4 className="font-bold text-white mb-2">Suggestions</h4>
                       <ul className="list-disc list-inside text-slate-300 space-y-1 text-sm">
@@ -472,12 +527,27 @@ ${profile.projects || "None specified."}
                       </ul>
                     </div>
                   )}
-                  {aiResult.roadmap && (
+
+                  {/* Missing Skills (Career Roadmap) */}
+                  {aiResult.missingSkills && aiResult.missingSkills.length > 0 && (
+                    <div>
+                      <h4 className="font-bold text-white mb-2">Skills You Need to Learn</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {aiResult.missingSkills.map((skill: string, i: number) => (
+                          <span key={i} className="px-3 py-1 bg-purple-500/20 border border-purple-500/30 text-purple-300 rounded-full text-xs">{skill}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Roadmap Steps (Career Roadmap) */}
+                  {aiResult.roadmapSteps && aiResult.roadmapSteps.length > 0 && (
                     <div className="space-y-4">
-                      {aiResult.roadmap.map((step: any, i: number) => (
-                        <div key={i} className="border-l-2 border-blue-500 pl-4 py-1">
-                          <h4 className="font-bold text-white text-sm">{step.step} - {step.duration}</h4>
-                          <p className="text-slate-400 text-xs mt-1">{step.focus}</p>
+                      <h4 className="font-bold text-white mb-2">Your Learning Roadmap</h4>
+                      {aiResult.roadmapSteps.map((step: any, i: number) => (
+                        <div key={i} className="border-l-2 border-blue-500 pl-4 py-2">
+                          <h4 className="font-bold text-white text-sm">Step {step.step}: {step.title}</h4>
+                          <p className="text-slate-400 text-xs mt-1">{step.description}</p>
                         </div>
                       ))}
                     </div>

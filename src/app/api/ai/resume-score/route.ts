@@ -1,4 +1,5 @@
-import { NextResponse, NextRequest } from "next/server";
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { aiCareerService } from "@/services/aiCareerService";
@@ -6,6 +7,7 @@ import { z } from "zod";
 
 const resumeScoreSchema = z.object({
   resumeUrl: z.string().url("Must provide a valid resume URL.").optional(),
+  pdfBase64: z.string().optional(),
   resumeText: z.string().optional(),
   targetRole: z.string().min(2, "Target role is required.")
 });
@@ -21,11 +23,19 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const parsed = resumeScoreSchema.parse(body);
 
-    if (!parsed.resumeUrl && !parsed.resumeText) {
-      return NextResponse.json({ success: false, error: { code: "VALIDATION_ERROR", message: "Either resumeUrl or resumeText is required." } }, { status: 400 });
+    if (!parsed.resumeUrl && !parsed.resumeText && !parsed.pdfBase64) {
+      return NextResponse.json({ success: false, error: { code: "VALIDATION_ERROR", message: "Either resumeUrl, pdfBase64, or resumeText is required." } }, { status: 400 });
     }
 
-    let finalResumeText = parsed.resumeText || "";
+    if (parsed.pdfBase64) {
+      const result = await aiCareerService.scoreResumePdf(parsed.pdfBase64, parsed.targetRole);
+      
+      if (!result.success) {
+        return NextResponse.json(result, { status: 500 });
+      }
+
+      return NextResponse.json(result, { status: 200 });
+    }
 
     if (parsed.resumeUrl) {
       // Download the PDF from the URL
@@ -35,27 +45,18 @@ export async function POST(req: NextRequest) {
       }
       const arrayBuffer = await response.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
+      const base64Data = buffer.toString("base64");
       
-      // Polyfill for pdfjs-dist used by pdf-parse in Node.js
-      if (typeof global !== "undefined") {
-        if (!global.DOMMatrix) {
-          (global as any).DOMMatrix = class DOMMatrix {};
-        }
-        if (!global.ImageData) {
-          (global as any).ImageData = class ImageData {};
-        }
-        if (!global.Path2D) {
-          (global as any).Path2D = class Path2D {};
-        }
+      const result = await aiCareerService.scoreResumePdf(base64Data, parsed.targetRole);
+      
+      if (!result.success) {
+        return NextResponse.json(result, { status: 500 });
       }
 
-      const pdfParseModule = require("pdf-parse");
-      const pdfParse = typeof pdfParseModule === "function" ? pdfParseModule : pdfParseModule.PDFParse;
-      const data = await pdfParse(buffer);
-      finalResumeText = data.text;
+      return NextResponse.json(result, { status: 200 });
     }
 
-    const result = await aiCareerService.scoreResume(finalResumeText, parsed.targetRole);
+    const result = await aiCareerService.scoreResume(parsed.resumeText || "", parsed.targetRole);
     
     if (!result.success) {
       return NextResponse.json(result, { status: 500 });

@@ -170,19 +170,34 @@ export default function AlumniDashboard() {
   const handleDraftMessage = async () => {
     setDraftingMsg(true);
     try {
+      const requester = reviewingReferral?.requester;
+      const opp = reviewingReferral?.opportunity;
+      
+      // Build a rich studentInfo string that passes .min(10) validation
+      const studentParts = [
+        requester?.name || "Student",
+        requester?.collegeEmail ? `(${requester.collegeEmail})` : "",
+        requester?.studentProfile?.department ? `Department: ${requester.studentProfile.department}` : "",
+        requester?.studentProfile?.skills?.length > 0 ? `Skills: ${requester.studentProfile.skills.join(", ")}` : ""
+      ].filter(Boolean).join(", ");
+      
+      const opportunityParts = opp 
+        ? `${opp.role} at ${opp.company}${opp.eligibility ? ` — Eligibility: ${opp.eligibility}` : ""}`
+        : "Target Role at Target Company";
+
       const res = await fetch("/api/ai/referral-message", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          studentInfo: reviewingReferral?.requester?.name || "Student",
-          opportunityInfo: reviewingReferral?.opportunity ? `${reviewingReferral.opportunity.role} at ${reviewingReferral.opportunity.company}` : "Target Role"
+          studentInfo: studentParts,
+          opportunityInfo: opportunityParts
         })
       });
       const data = await res.json();
       if (data.success) {
         setAiDraft(data.data.message);
       } else {
-        alert("Failed to draft message");
+        alert(data.error?.message || "Failed to draft message");
       }
     } catch (error) {
       alert("Error generating message");
