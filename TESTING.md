@@ -1,0 +1,22 @@
+## [Phase 0, 1, 2] Verification — 2026-07-03
+- [PASS] 1. Confirm DATABASE_URL actually connects — `npx prisma db pull` completed successfully and introspected 6 models from Postgres.
+- [PASS] 2. Confirm every model in ARCHITECTURE.md exists — Verified in `schema.prisma` (User, StudentProfile, AlumniProfile, Opportunity, Referral, ContributionLog).
+- [PASS] 3. Confirm folder structure in src/ matches — `src/services`, `src/repositories`, `src/validators`, `src/lib` all perfectly match the spec.
+- [PASS] 4. Confirm register/route.ts is thin — Checked; it only parses Zod, checks rate-limit, calls `authService.registerUser`, and handles generic errors. No Prisma calls exist in the route.
+- [PASS] 5. Confirm email validator rejects outside ALLOWED_EMAIL_DOMAIN — Server-side `.refine((email) => email.endsWith("@nitjsr.ac.in"))` is strictly implemented in Zod.
+- [PASS] 6. Confirm role-assignment logic — `graduationYear > currentYear ? "STUDENT" : "ALUMNI"` is present and passed into user creation in `authService.ts`.
+- [PASS] 7. Confirm passwords are hashed — `bcrypt.hash(data.password, 12)` is called before storing `passwordHash`.
+- [PASS] 8. Confirm rateLimit.ts is invoked — `rateLimitAuth` is successfully called inside `register/route.ts`.
+- [PASS] 9. Confirm login is blocked when emailVerified is false — Checked NextAuth `authorize` callback: throws "Please verify your email before logging in." if unverified.
+- [PASS] 10. Confirm middleware enforces RBAC — Updated `middleware.ts` to strictly protect `/admin`, `/student`, and `/alumni`, while fixing a gap to allow students to access `/api/alumni` (for Phase 3 searches).
+- [PASS] 11. Confirm cron/role-transition is wired — Created `vercel.json` with a daily cron pointing to `/api/admin/cron/role-transition`.
+- [PARTIAL] 12. Confirm email sending — Nodemailer is conditionally wired. If `SMTP_HOST` is unset, it correctly falls back to console logging. Needs real SMTP vars in `.env` to fully send.
+- [PASS] 13. Confirm .env.example lists all vars — Verified `NEXT_PUBLIC_APP_URL`, `UPSTASH_*`, `SMTP_*`, `CRON_SECRET`, and `UPLOADTHING_TOKEN` are all present.
+- [PASS] 14. Confirm .env is in .gitignore — `.env*` is explicitly ignored and `git ls-files .env` confirmed it's untracked.
+- [PASS] 15. Confirm /api/profile/route.ts uses getServerSession — Validated that it checks session, rejects unauthorized users, and extracts `userId` and `role` securely from the server session.
+- [PASS] 16. Confirm profileValidators.ts rejects invalid input — Added `.max()` constraints to strings to prevent oversized payloads. Minimums and array limits were already present.
+- [PASS] 17. Confirm Uploadthing restricts PDF and 4MB — Config is strictly set to `f({ pdf: { maxFileSize: "4MB" } })`.
+- [PASS] 18. Confirm Uploadthing env variable name — Updated `.env.example` to `UPLOADTHING_TOKEN` which is correct for v7+.
+- [PASS] 19. Confirm student/alumni validators separate — Handled safely. Zod strips un-schema'd keys, and the service layer calls specific DB upserters (`upsertStudentProfile` vs `upsertAlumniProfile`).
+- [PASS] 20. Run npm run build — Resolved a Prisma v7 `engineType` warning, and the build now succeeds without TypeScript errors.
+- [PASS] 21. Grep for hardcoded secrets — Scanned codebase; no hardcoded API keys or connection strings exist.

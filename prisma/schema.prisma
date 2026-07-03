@@ -1,0 +1,94 @@
+generator client {
+  provider = "prisma-client-js"
+  engineType = "library"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                  String          @id @default(cuid())
+  collegeEmail        String          @unique
+  passwordHash        String
+  role                Role
+  emailVerified       Boolean         @default(false)
+  verificationToken   String?         @unique
+  graduationYear      Int
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+  contributionScore   Int             @default(0)
+  isBanned            Boolean         @default(false)
+  name                String
+  alumniProfile       AlumniProfile?
+  postedOpportunities Opportunity[]   @relation("PostedBy")
+  referralsGiven      Referral[]      @relation("ReferrerUser")
+  referralsRequested  Referral[]      @relation("RequesterUser")
+  studentProfile      StudentProfile?
+}
+
+model StudentProfile {
+  id         String   @id @default(cuid())
+  userId     String   @unique
+  department String
+  skills     String[]
+  projects   Json?
+  resumeUrl  String?
+  user       User     @relation(fields: [userId], references: [id])
+}
+
+model AlumniProfile {
+  id                  String   @id @default(cuid())
+  userId              String   @unique
+  company             String
+  jobRole             String
+  department          String
+  industry            String
+  experienceYrs       Int
+  skills              String[]
+  responsivenessScore Float    @default(0)
+  referralSuccessRate Float    @default(0)
+  verifiedBadge       Boolean  @default(false)
+  user                User     @relation(fields: [userId], references: [id])
+}
+
+model Opportunity {
+  id              String     @id @default(cuid())
+  postedById      String
+  company         String
+  role            String
+  eligibility     String
+  requiredSkills  String[]
+  deadline        DateTime
+  applicationLink String
+  createdAt       DateTime   @default(now())
+  postedBy        User       @relation("PostedBy", fields: [postedById], references: [id])
+  referrals       Referral[]
+}
+
+model Referral {
+  id            String      @id @default(cuid())
+  opportunityId String
+  requesterId   String
+  referrerId    String
+  status        String      @default("PENDING")
+  createdAt     DateTime    @default(now())
+  opportunity   Opportunity @relation(fields: [opportunityId], references: [id])
+  referrer      User        @relation("ReferrerUser", fields: [referrerId], references: [id])
+  requester     User        @relation("RequesterUser", fields: [requesterId], references: [id])
+}
+
+model ContributionLog {
+  id        String   @id @default(cuid())
+  userId    String
+  points    Int
+  reason    String
+  createdAt DateTime @default(now())
+}
+
+enum Role {
+  STUDENT
+  ALUMNI
+  ADMIN
+}
