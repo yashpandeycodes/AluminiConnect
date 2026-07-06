@@ -1,5 +1,5 @@
 import { generateJSON, generateJSONWithPdf } from "@/lib/ai/gemini";
-import { buildAtsScorePrompt, buildReferralMessagePrompt, buildCareerRoadmapPrompt } from "@/lib/ai/prompts";
+import { buildAtsScorePrompt, buildReferralMessagePrompt, buildCareerRoadmapPrompt, buildCareerIntelligencePrompt, buildCareerInsightPrompt } from "@/lib/ai/prompts";
 import { Result } from "@/types";
 
 export type AtsScoreResult = {
@@ -19,6 +19,29 @@ export type CareerRoadmapResult = {
     title: string;
     description: string;
   }[];
+};
+
+export interface CareerIntelligence {
+  careerSummary: string;
+  strengths: string[];
+  weaknesses: string[];
+  learningPriorities: string[];
+  implicitSkills: string[];
+  topDomains: string[];
+  careerStage: string;
+  resumeQuality: {
+    score: number;
+    summary: string;
+  };
+  generatedAt?: string;
+  promptVersion?: string;
+  aiConfidence?: number;
+}
+
+export type CareerIntelligenceResult = {
+  readinessScore: number;
+  confidenceScore: number;
+  intelligence: CareerIntelligence;
 };
 
 export const aiCareerService = {
@@ -75,6 +98,39 @@ export const aiCareerService = {
     } catch (error) {
       console.error("Generate career roadmap error:", error);
       return { success: false, error: { code: "INTERNAL_ERROR", message: "Failed to generate career roadmap." } };
+    }
+  },
+
+  async generateCareerIntelligence(profileData: string, resumeText: string, targetRole?: string): Promise<Result<CareerIntelligenceResult>> {
+    try {
+      if (!profileData) {
+         return { success: false, error: { code: "INVALID_REQUEST", message: "Profile data is required." } };
+      }
+      const prompt = buildCareerIntelligencePrompt(profileData, resumeText, targetRole);
+      const data = await generateJSON<CareerIntelligenceResult>(prompt);
+      
+      // Inject timestamps and prompt metadata
+      data.intelligence.generatedAt = new Date().toISOString();
+      data.intelligence.promptVersion = "v1";
+      
+      return { success: true, data };
+    } catch (error) {
+      console.error("Generate career intelligence error:", error);
+      return { success: false, error: { code: "INTERNAL_ERROR", message: "Failed to generate career intelligence." } };
+    }
+  },
+
+  async generateAIInsights(careerIntelligence: any): Promise<Result<any[]>> {
+    try {
+      if (!careerIntelligence) {
+         return { success: false, error: { code: "INVALID_REQUEST", message: "Career intelligence is required." } };
+      }
+      const prompt = buildCareerInsightPrompt(careerIntelligence);
+      const data = await generateJSON<any[]>(prompt);
+      return { success: true, data };
+    } catch (error) {
+      console.error("Generate career insights error:", error);
+      return { success: false, error: { code: "INTERNAL_ERROR", message: "Failed to generate career insights." } };
     }
   }
 };

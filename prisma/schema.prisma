@@ -1,5 +1,5 @@
 generator client {
-  provider = "prisma-client-js"
+  provider   = "prisma-client-js"
   engineType = "library"
 }
 
@@ -9,23 +9,30 @@ datasource db {
 }
 
 model User {
-  id                  String          @id @default(cuid())
-  collegeEmail        String          @unique
-  passwordHash        String
-  role                Role
-  emailVerified       Boolean         @default(false)
-  verificationToken   String?         @unique
-  graduationYear      Int
-  createdAt           DateTime        @default(now())
-  updatedAt           DateTime        @updatedAt
-  contributionScore   Int             @default(0)
-  isBanned            Boolean         @default(false)
-  name                String
-  alumniProfile       AlumniProfile?
-  postedOpportunities Opportunity[]   @relation("PostedBy")
-  referralsGiven      Referral[]      @relation("ReferrerUser")
-  referralsRequested  Referral[]      @relation("RequesterUser")
-  studentProfile      StudentProfile?
+  id                   String                 @id @default(cuid())
+  collegeEmail         String                 @unique
+  passwordHash         String
+  role                 Role
+  emailVerified        Boolean                @default(false)
+  verificationToken    String?                @unique
+  graduationYear       Int
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  contributionScore    Int                    @default(0)
+  isBanned             Boolean                @default(false)
+  name                 String
+  alumniProfile        AlumniProfile?
+  postedOpportunities  Opportunity[]          @relation("PostedBy")
+  referralsGiven       Referral[]             @relation("ReferrerUser")
+  referralsRequested   Referral[]             @relation("RequesterUser")
+  studentProfile       StudentProfile?
+  careerState          CareerState?
+  CareerGoal           CareerGoal[]
+  CareerRecommendation CareerRecommendation[]
+  CareerMission        CareerMission[]
+  CareerTimeline       CareerTimeline[]
+  CareerAnalytics      CareerAnalytics?
+  CareerPrediction     CareerPrediction?
 }
 
 model StudentProfile {
@@ -91,4 +98,210 @@ enum Role {
   STUDENT
   ALUMNI
   ADMIN
+}
+
+enum CareerStateSyncStatus {
+  READY
+  SYNCING
+  FAILED
+}
+
+enum CareerStateAnalysisSource {
+  PROFILE_UPDATE
+  RESUME_UPLOAD
+  MANUAL_REFRESH
+  SYSTEM_REBUILD
+}
+
+model CareerState {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id])
+
+  readinessScore  Float @default(0)
+  confidenceScore Float @default(0)
+
+  intelligence Json
+
+  schemaVersion  Int                        @default(1)
+  syncStatus     CareerStateSyncStatus      @default(READY)
+  analysisSource CareerStateAnalysisSource?
+  analysisModel  String?
+
+  lastAnalyzedAt DateTime @default(now())
+}
+
+enum GoalStatus {
+  ACTIVE
+  ACHIEVED
+  ARCHIVED
+  ON_HOLD
+}
+
+enum GoalPriority {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+model CareerGoal {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  targetRole         String
+  targetCompanies    String[]
+  targetIndustries   String[]
+  preferredLocations String[]
+  targetPackage      String?
+  deadline           DateTime?
+
+  priority GoalPriority @default(MEDIUM)
+  status   GoalStatus   @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+enum RecommendationCategory {
+  LEARNING
+  PROJECT
+  CERTIFICATION
+  JOB
+  REFERRAL
+  NETWORKING
+  COMPETITION
+  OPEN_SOURCE
+}
+
+enum RecommendationStatus {
+  ACTIVE
+  COMPLETED
+  DISMISSED
+  EXPIRED
+}
+
+model CareerRecommendation {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  category       RecommendationCategory
+  title          String
+  description    String
+  reasoning      String
+  actionableStep String
+  resourceUrl    String?
+  estimatedHours Int?
+
+  priorityScore   Int
+  impactScore     Int
+  confidenceScore Int
+
+  status             RecommendationStatus @default(ACTIVE)
+  generatedByAI      Boolean              @default(true)
+  careerStateVersion Int
+  goalId             String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([category])
+}
+
+enum MissionStatus {
+  ACTIVE
+  COMPLETED
+  EXPIRED
+  CANCELLED
+}
+
+enum MissionPriority {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+model CareerMission {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  title          String
+  description    String
+  objective      String
+  estimatedHours Int
+  priority       MissionPriority
+  status         MissionStatus   @default(ACTIVE)
+  orderIndex     Int
+
+  metadata  Json?
+  startDate DateTime?
+  dueDate   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, status])
+}
+
+enum TimelineStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+model CareerTimeline {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  timeline                Json
+  estimatedCompletionDate DateTime?
+  totalEstimatedHours     Int
+  weeklyHours             Int
+  scheduleHealth          Float
+
+  status TimelineStatus @default(ACTIVE)
+
+  timelineVersion          Int      @default(1)
+  scheduleAlgorithmVersion String   @default("v1")
+  generatedAt              DateTime @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, status])
+}
+
+model CareerAnalytics {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id])
+
+  currentMetrics    Json
+  historicalMetrics Json
+
+  analyticsVersion Int    @default(1)
+  formulaVersion   String @default("v1")
+
+  generatedAt DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model CareerPrediction {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id])
+
+  currentPrediction Json
+  predictionHistory Json
+
+  predictionVersion Int @default(1)
+
+  generatedAt DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
